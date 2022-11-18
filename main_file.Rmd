@@ -1,0 +1,54 @@
+---
+title: "Kontur Population"
+author: "Orhan Aktas"
+date: '2022-11-18'
+output:   
+    html_document:
+      df_print: !expr knitr::kable
+      toc: yes
+      number_sections: yes
+      toc_depth: 2
+---
+
+```{r setup, include=FALSE,echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  class.source = "bg-warning text-warning"
+)
+```
+
+#### Required Libraries {.unlisted .unnumbered}
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggridges)
+```
+
+# Introduction
+data import
+```{r}
+
+returns <- read_excel("data/returns.xlsx",range = "A2:J462")
+
+```
+
+data tidying
+```{r}
+cols <- c("code","name","type","month1","month3","month6","ybd","year1","year3","year5")
+
+returns <- returns |> set_names(cols) 
+
+```
+
+```{r}
+returns |>
+  ggplot(aes(x=month1,y=type),fill = stat(x))+
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01)
+
+  
+```
+Hisse senedi şemsiye fonu 
+
+
