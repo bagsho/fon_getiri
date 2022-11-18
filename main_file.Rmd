@@ -1,5 +1,5 @@
 ---
-title: "Kontur Population"
+title: "Fon Getirileri"
 author: "Orhan Aktas"
 date: '2022-11-18'
 output:   
@@ -23,6 +23,7 @@ knitr::opts_chunk$set(
 
 ```{r libraries, message=FALSE, warning=FALSE}
 library(tidyverse)
+library(readxl)
 library(ggridges)
 ```
 
@@ -43,12 +44,38 @@ returns <- returns |> set_names(cols)
 ```
 
 ```{r}
-returns |>
-  ggplot(aes(x=month1,y=type),fill = stat(x))+
-    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01)
+returns |>mutate(stock=ifelse(type=="Hisse Senedi Şemsiye Fonu",1,0)) |> 
+  ggplot(aes(x=month1,y=type,fill=stock))+
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01)+
+  theme(legend.position="none")
 
   
 ```
-Hisse senedi şemsiye fonu 
 
+Hisse senedi şemsiye fonu en çok kazandıran. Peki ayrı zaman dilimleri için bakalım.
+```{r}
+returns_long <- returns |>
+  pivot_longer(
+    cols = month1:year5,
+    names_to = "duration",
+    values_to = "return"
+  )
+```
+
+```{r}
+returns_long |>  
+  ggplot(aes(x=return)) +
+    geom_histogram() +
+    facet_grid(vars(duration), vars(type))
+```
+
+bu pek güzel durmuyor. hisse fonları ile diğerlerini ggridges ile karşılaştıralım.
+```{r}
+return_stock<-returns_long |> filter(type=="Hisse Senedi Şemsiye Fonu")
+return_non_stock<-returns_long |> filter(type!="Hisse Senedi Şemsiye Fonu")
+
+  ggplot(return_non_stock,aes(x=return,y=duration))+
+    geom_density_ridges(scale = 1, rel_min_height = 0.01,alpha=0.1)+
+    geom_density_ridges(data=return_stock,aes(x=return,y=duration),scale = 1, rel_min_height = 0.01,alpha=0.1,col="red")
+```
 
