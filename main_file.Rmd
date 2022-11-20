@@ -79,3 +79,106 @@ return_non_stock<-returns_long |> filter(type!="Hisse Senedi Şemsiye Fonu")
     geom_density_ridges(data=return_stock,aes(x=return,y=duration),scale = 1, rel_min_height = 0.01,alpha=0.1,col="red")
 ```
 
+farklı dönemlerin getirileri de farklı ölçeklerde olduğu için bütün getirileri aylık olarak hesaplayarak dağılımlara bakalım.
+```{r}
+
+  return_stock |> 
+    filter(duration!="ybd") |> 
+    mutate(monthly_return= 
+             case_when(duration=="month1" ~ return,
+                       duration=="month3" ~ ((return/100+1)^(1/3)-1)*100,
+                       duration=="month6" ~ ((return/100+1)^(1/6)-1)*100,
+                       duration=="year1" ~ ((return/100+1)^(1/12)-1)*100,
+                       duration=="year3" ~ ((return/100+1)^(1/36)-1)*100,
+                       duration=="year5" ~ ((return/100+1)^(1/60)-1)*100
+
+                           )
+    ) |> 
+    ggplot(aes(x=monthly_return,y=duration, group = duration, fill = duration))+
+      geom_density_ridges(scale = 1, rel_min_height = 0.01)+
+  scale_x_continuous(breaks = c(-1:9)*5, limits = c(-10, 50), expand = c(0, 0))+
+  theme(legend.position="none")
+```
+
+evet. beklendiği gibi getiriler zaman uzadıkça azalıyor ve ortalamaya yaklaşıyor. 1 ay ve 3 ay arasında net bir karar vermek zor. Uç noktada getiri veren fonlar beklendiği gibi 1 aylıkta daha fazlayken, negatif getirisi olan fonlar garip bir şekilde 3 aylık getirilerde daha fazla. Bunlar 6 ayda 0'ın üstüne çıkıyor. Yine bir başka ilginç nokta da ortalama etrafındaki getiri yığınlarına bakıldığında 3 aylık getirilerin buralarda 1 aylık getirilerden daha fazla olduğu. 
+
+daha sonra histogram ile de baktım. Ancak histogramda aralık vermek gerektiği için görseller yanlış yönlendiriyor. Örneğin beş senelik getiriler aslında normal dağılıyor ancak histogramda sanki dengesiz bir dağılımmış gibi görünüyor.
+```{r}
+  return_stock |> 
+    filter(duration!="ybd") |> 
+    mutate(monthly_return= 
+             case_when(duration=="month1" ~ return,
+                       duration=="month3" ~ ((return/100+1)^(1/3)-1)*100,
+                       duration=="month6" ~ ((return/100+1)^(1/6)-1)*100,
+                       duration=="year1" ~ ((return/100+1)^(1/12)-1)*100,
+                       duration=="year3" ~ ((return/100+1)^(1/36)-1)*100,
+                       duration=="year5" ~ ((return/100+1)^(1/60)-1)*100
+
+                           )
+    ) |> 
+    ggplot(aes(x=monthly_return,y=duration, group = duration, fill = duration, height = stat(density)))+
+      geom_density_ridges(
+        stat = "binline", 
+        boundary = 0,
+        binwidth  = 5, 
+        scale = 0.95, 
+        draw_baseline = FALSE
+      )+
+  scale_x_continuous(breaks = c(-1:9)*5, limits = c(-10, 50), expand = c(0, 0))+
+  theme(legend.position="none")
+```
+hisse senedi şemsiye fonu spesifik fon analizi
+
+portfoy değişkeni ekle
+```{r}
+returns_portfoy <- returns |> 
+  filter(type=="Hisse Senedi Şemsiye Fonu") |> 
+  rowwise() |> 
+  mutate(portfoy_pos=str_locate(name,"PORTFÖY")[1]) |>
+  mutate(portfoy_name=ifelse(
+    is.na(portfoy_pos),
+    word(name, 1),
+    str_sub(name, 
+            end=str_locate(name,"PORTFÖY")[1]-2)
+    )
+  ) |> 
+  select(-code,-type,-portfoy_pos)
+```
+
+portfoylerin 3 aylık getiri sıralaması
+```{r}
+returns_portfoy|> 
+  filter(!is.na(month3)) |> 
+  group_by(portfoy_name) |> 
+  summarise(av_return=mean(month3),count=n()) |> 
+  arrange(-av_return) |> 
+  view()
+```
+
+3 ay
+```{r}
+mltp_fund_portfoys<-returns_portfoy|> 
+  filter(!is.na(month3)) |> 
+  count(portfoy_name) |> 
+  filter(n>1) |> 
+  select(portfoy_name)
+
+returns_portfoy|> 
+  filter(portfoy_name %in% mltp_fund_portfoys$portfoy_name ) |> 
+  filter(!is.na(month3)) |> 
+  ggplot(aes(x=portfoy_name, y=month3)) + 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2))+
+  coord_flip()
+```
+
+Portfoy firmalarının kendi içlerinde getirileri benzemiyor. Ancak burayı biraz daha incelemek lazım. Örneğin bazı portfoylerin tüm fonları belli bir seviyenin üzerinde. Onun dışında garip durumlar da var. Mesela Ziraat'in iki fonu dışında tüm fonları oldukça fazla kazandırmış. 
+
+```{r}
+returns_portfoy|> 
+    filter(portfoy_name =="ZİRAAT" ) |> 
+    select(name,month3)
+```
+
+Burada görülüyor ki aslında tek fon. Grafikte bir hata olmuş. düzeltilmesi gerekiyor. Hem boxplot en alt değeri outlier olarak göstermiş hem de jitter diğer datalarla birlikte bunu da göstermiş. Bu nedenle iki kez görülüyor.
+
